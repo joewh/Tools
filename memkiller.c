@@ -11,13 +11,16 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <string.h>
 
+extern int usleep (__useconds_t __useconds);
 void printUsage(void);
 
 
 int main (int argc, char **argv)
 {
     int fastFlag = 0;
+    int stopFlag = 0;
     unsigned int memAmount = 0; // 0 = infinite, until OOM
 
     optind = 1;		// Reset parsing
@@ -46,6 +49,7 @@ int main (int argc, char **argv)
                 printUsage();
                 return EXIT_FAILURE;
             }
+            stopFlag = 1;
             break;
         default:
             fprintf(stderr, "Cancelled\n");
@@ -57,17 +61,28 @@ int main (int argc, char **argv)
     // malloc-Loop
     unsigned int n = 0;
     while (1) {
+    	void *memPtr;
+
         if (memAmount > 0 && (n >= memAmount))
             break;
-        if (malloc(1024 * 1024) == NULL)
+
+        memPtr = malloc(1024 * 1024);
+
+        if (memPtr == NULL)
         {
             printf("malloc failure after %u MiB\n", n);
-            return 0;
+
+            if (stopFlag)	// break if stop required
+            	return 0;
         }
-        printf ("got %u MiB\n", ++n);
+        else
+        {
+        	memset(memPtr, 0xaa, 1024 * 1024);
+        	printf ("got %u MiB\n", ++n);
+        }
 
         if (!fastFlag)
-            usleep(1000 * 2);
+            usleep(1000 * 10);
     }
 }
 
@@ -78,6 +93,6 @@ void printUsage(void)
 	printf("Allocates all the memory\n");
 	printf("  -h           Prints this help\n");
 	printf("  -f           Fast (no usleep in the loop)\n");
-	printf("  -m <sizeMB>  Allocates only up to <size> MBytes (1048576 Byts)\n");
+	printf("  -m <sizeMB>  Stop after <size> MBytes has been allocated\n");
 	printf("\n");
 }
